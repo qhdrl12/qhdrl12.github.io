@@ -1,8 +1,9 @@
 theme: jekyll-theme-cayman
 
 locale: "en-US"
-title: "Bong Title"
+title: "Develop!"
 title_separator: "-"
 name: "Bong"
+description: "Development Diary"
 url: "https://qhdrl12.github.io/"
 baseurl: ""
