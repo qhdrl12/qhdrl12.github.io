@@ -1,1 +1,8 @@
 theme: jekyll-theme-cayman
+
+locale: "en-US"
+title: "Bong Title"
+title_separator: "-"
+name: "Bong"
+url: "https://qhdrl12.github.io/"
+baseurl: ""
