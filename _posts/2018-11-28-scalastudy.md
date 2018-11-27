@@ -1,0 +1,444 @@
+
+# 2. 함수형 프로그래밍이란 
+함수형 프로그래밍은 프로그램을 오직 **순수 함수**들로만 구축하는 것을 말한다. 순수 함수는 **부수 효과**가 없는 함수를 말하며, 부수 효과란 결과를 돌려주는 것 이외의 어떤 일을 말한다.
+
+부수 효과의 몇 가지 예는 다음과 같다.
+
+1. 변수를 수정한다.
+2. 자료구조를 제자리에서 수정한다.
+3. 객체의 필드를 설정한다.
+4. 예외를 던지거나 오류를 내면서 실행을 중단한다.
+5. 콘솔에 출력하거나 사용자의 입력을 읽어들인다.
+6. 파일에 기록하거나 파일에서 읽어들인다.
+7. 화면에 그린다.
+
+위와 같은 일들을 수행할 수 없는 프로그래밍을 상상해보면, 다음과 같은 질문들이 떠오른다.
+
+변수를 수정할 수 없다면, 루프는 어떻게 작성할까?
+변하는 자료는 어떻게 다루어야 할까?
+예외를 던지지 않고 오류를 처리하려면?
+화면에 뭔가를 그리거나 파일 입출력을 수행하는 프로그램은?
+FP는 프로그램을 작성하는 방식에 대한 제약이지 표현 가능한 프로그램의 종류에 대한 제약이 아니다.
+
+순수 함수로 프로그램을 작성하면 모듈성이 향상되며, 이는 곧 테스트, 재사용, 병렬화, 일반화, 분석이 쉽다는 것을 의미한다. 순수 함수는 버그가 생길 여지가 훨씬 적다.
+
+간단한 프로그램에서 부수 효과를 제거해 가면서 FP의 이점을 살펴보고 FP의 중요한 두 가지 개념, **참조 투명성**과 **치환 모델**에 대해서 알아보자.
+
+## 1.1 FP의 이점: 간단한 예제 하나
+1.1.1 부수 효과가 있는 프로그램
+```scala
+class Cafe {
+  def buyCoffee(cc: CreditCard): Coffee = {
+    val cup = new Coffee()
+    cc.charge(cup.price)
+    cup
+  }
+}
+```
+위 프로그램에서 cc.charge(cup.price)가 부수 효과의 예이다. cc.charge라는 신용카드 청구 행위에서 프로그램에서는 카드사와 연결하여 트랜잭션을 승인하고 대금을 청구하고 거래 기록을 저장하는 등의 외부와의 상호 작용이 발생한다. 히지만 이 프로그램에서는 단지 Coffee 객체 하나를 리턴할 뿐이고 그 외의 동작은 부수적으로 일어난다.
+
+위 프로그램에 대한 유닛 테스트를 작성한다고 생각해보자. 테스트를 위해 실제 신용카드 청구를 할 수는 없기 때문에 cc.charge는 실제로 외부와 연결되면 안되며 이는 테스트 작성을 어렵게 만든다. 
+
+CreditCard에서 결제와 관련된 부분을 제거하고 이를 담당하는 Payments 객체를 buyCoffee에 전달한다면 코드의 모듈성과 검사성을 좀 더 높일 수 있다.
+
+```scala
+class Cafe {
+  def buyCoffee(cc: CreditCard, p: Payments): Coffee = {
+    val cup = new Coffee()
+    p.charge(cc, cup.price)
+    cup
+  }
+}
+```
+
+그래도 여전히 p.charge(cc, cup.price)를 호출할 때 부수 효과가 발생한다. Payments 인터페이스에 대한 Mock을 만들어 테스트 작성은 좀 더 쉬워질 수 있으나 이상적인 방법은 아니다. 예를 들어 buyCoffee 호출 이후에 어떤 상태 값을 검사해야 한다고 한다면, 테스트 과정에서 p.charge 호출에 의해 그 상태가 적절히 변경되었는지 확인해야 한다.
+
+테스트 문제 외에도 함수를 재사용하기 어렵다는 문제가 있다. 커피 한 잔이 아니라 열두 잔을 주문한다고 했을 때, buyCoffee를 열두 번 호출하게 되면 카드 수수료가 12회 청구될 것이다.
+
+1.1.2 함수적 해법: 부수 효과의 제거
+이에 대한 함수적 해법은 부수 효과를 제거하고 buyCoffee가 Coffee뿐만 아니라 **청구서**를 돌려주게 하는 것이다.
+
+```scala
+class Cafe {
+  def buyCoffee(cc: CreditCard): (Coffee, Charge) = {
+    val cup = new Coffee()
+    (cup, Charge(cc, cup.price))
+  }
+}
+```
+
+```scala
+case class Charge(cc: CreditCard, amount: Double) {
+  def combine(other: Charge): Charge = 
+    if (cc == other.cc) // scala의 if는 statement가 아니라 expression이다.
+      Charge(cc, amount + other.amount)
+    else
+      throw new Exception("Can't combine charges to different cards")
+}
+```
+
+관심사의 분리(sepration of concerns)를 통해 청구서의 생성 문제가 이에 대한 처리 또는 연동 문제와 분리되었다. 이제 여러 잔의 커피를 구매하기 위해 buyCoffee를 재사용할 수 있다.
+
+```scala
+class Cafe {
+  def buyCoffee(cc: CreditCard): (Coffee, Charge) = ???
+  
+  def buyCoffees(cc: CreditCard, n: Int): (List[Coffee], Charge) = {
+    val purchases: List[(Coffee, Charge)] = List.fill(n)(buyCoffee(cc))
+    val (coffees, charges) = 
+      purchases.unzip(coffees, charges.reduce((c1, c2) => c1.combine(c2)))
+  }
+}
+```
+
+buyCoffee를 직접 재사용하여 buyCoffees 함수를 정의하였으며, 두 함수 모두 Payments 인터페이스의 Mock 없이도 쉽게 테스트를 작성할 수 있게 되었다. Charge를 일급 함수로 만들면 이를 조합하여 같은 카드에 대한 청구서들을 하나의 List[Charge]로 취합하는 것도 가능하다.
+
+```scala
+def coalesce(charges: List[Charge]): List[Charge] =
+  charges.groupBy(_.cc).values.map(_.reduce(_ combine _)).toList
+```
+
+FP는 많은 사람들이 좋다고 여기는 생각을 논라적인 극한으로까지 밀어붙이는, 그리고 그것을 언뜻 보기에는 적용할 수 없을 것 같은 상황에도 적용하는 규율일 뿐이다.
+
+## 1.2 (순수)함수란 구체적으로 무엇인가?
+FP는 순수 함수로 프로그래밍하는 것이며 순수 함수는 부수 효과가 없는 함수라는 것을 알아봤다. 함수적으로 프로그래밍한다는 것이 무슨 뜻인지 좀 더 구체적으로 이해하려면 효과와 순수라는 개념을 공식적으로 정의할 필요가 있다. 그러한 정의는 함수형 프로그래밍의 또 다른 이점인, 순수 함수는 추론하기가 더 쉽다는 점을 이해하는 데에도 도움이 된다.
+
+f: A => B에서 b는 오직 a의 값에 의해서만 결정되며 내부의 상태 변화나 외부의 처리 과정은 f(a)의 결과를 결정하는데 어떠한 영향도 주지 않는다. 즉, 함수는 주어진 입력으로 결과를 계산하는 것 외에는 프로그램의 실행에 어떠한 영향도 미치지 않는다. 이를 두고 부수 효과가 없다고 말하며 좀 더 명시적으로 순수 함수라고 부르기도 한다.
+
+순수 함수의 이러한 개념을 **참조 투명성**이라는 개념을 이용해서 공식화할 수 있다. 참조 투명성은 함수가 아니라 **표현식**의 한 속성이다. 임의의 프로그램에서 어떤 표현식을 그 평가 결과로 바꾸어도 프로그램의 의미가 변하지 않는다면 그 표현식은 참조에 투명하다. 예를 들어 프로그램에 있는 2 + 3을 모두 값 5로 바꾸어도 프로그램의 의미는 변경되지 않는다.
+
+## 1.3 참조 투명성, 순수성, 그리고 치환 모델
+```scala
+def buyCoffee(cc: CreditCard): Coffee = {
+  val cup = new Coffee()
+  cc.charge(cup.price)
+  cup
+}
+```
+
+위 예제에서 cc.charge(cup.price)의 반환 값은 무시되어 buyCoffee의 결과 값은 new Coffee()와 같아진다. buyCoffee가 순수하려면 임의의 p에 대해 p(buyCoffee(cc))가 p(new Coffee())와 동등해야 하지만, 그렇지 않음을 알 수 있다.
+
+참조 투명성은 함수가 수행하는 모든 것이 함수가 돌려주는 값으로 대표된다는 불변(invariant) 조건을 강제한다. 이러한 제약은 **치환 모형**이라고 불리는 프로그램 평가에 대한 추론 모형을 가능하게 한다. 표현식이 참조에 투명하다면 그 계산 과정은 대수 방정식을 풀 때와 비슷해지며 프로그램에 대한 **등식적 추론**을 가능하게 한다.
+
+참조에 투명한 함수의 예.
+
+```scala
+scala> val x = "Hello, World"
+x: java.lang.String = Hello, World
+  
+scala> val r1 = x.reverse
+r1: String = dlroW ,olleH
+  
+scala> val r2 = x.reverse
+r2: String = dlroW ,olleH // r1과 r2는 같다.
+
+// `x`항의 모든 출현을 `x`가 지칭하는 표현식으로 치환
+  
+scala> val r1 = "Hello, World".reverse
+r1: String = dlroW ,olleH
+  
+scala> val r2 = "Hello, World".reverse
+r2: String = dlroW ,olleH // r1과 r2는 여전히 같다.
+```
+
+참조에 투명하지 않은 함수의 예.
+
+```scala
+scala> val x = new StringBuilder("Hello")
+x: java.lang.StringBuilder = Hello
+  
+scala> val y = x.append(", World")
+y: java.lang.StringBuilder = Hello, World
+  
+scala> val r1 = y.toString
+r1: java.lang.String = Hello, World
+  
+scala> val r2 = y.toString
+r2: java.lang.String = Hello, World // r1과 r2는 같다.
+
+// `y`항의 모든 출현을 해당 `append` 호출로 치환
+
+scala> val x = new StringBuilder("Hello")
+x: java.lang.StringBuilder = Hello
+  
+scala> val r1 = x.append(", World").toString
+r1: java.lang.String = Hello, World
+  
+scala> val r2 = x.append(", World").toString
+r2: java.lang.String = Hello, World, World // 이제 r1과 r2는 같지 않다.
+```
+
+참조에 투명하지 않은 함수의 경우 r1과 r2가 같은 표현식처럼 보이지만 r2가 x.append를 호출하는 시점에서 r1으로 인해 x가 참조하는 객체가 변이되었다. 부수 효과로 인해 프로그램 결과에 대한 추론이 어려워지는 예이다. 반면 치환 모형은 부수 효과가 평가되는 표현식 자체에만 영향을 미치므로 국소 추론만으로 코드를 이해할 수 있다.
+
+
+---
+
+
+# 2장. 스칼라로 함수형 프로그래밍 시작하기
+스칼라의 언어와 그 문법의 기초를 배운다.
+함수형 프로그래밍에 쓰이는 기본적인 기법을 배운다.
+1. 꼬리 재귀 함수를 이용해서 루프를 작성하는 방법
+2. 고차 함수(다른 함수를 인수로 받는 함수로서, 또 다른 함수를 결과로 돌려줄 수 있다)
+3. 다형적 고차 함수
+
+## 2.1 스칼라 언어의 소개: 예제 하나
+```scala
+object MyModule {
+  def abs(n: Int): Int = 
+    if (n < 0) -n
+    else n
+  
+  private def formatAbs(x: Int) = { 
+    val msg = "The absolute value of %d is %d"
+    msg.format(x, abs(x))
+  }
+  
+  def main(args: Array[String]): Unit =
+    println(formatAbs(-42))
+}
+```
+
+위 예제는 MyModule이라는 이름의 객체(object; **모듈**이라고도 한다)를 선언한다.
+
+object 키워드
+* singleton 객체를 생성
+* Java의 정적 멤버(static member)를 가진 클래스를 만들만한 상황에 사용
+* Companion Object를 만들 때 사용
+* MyModule 객체에는 def 키워드로 도입된 **메서드**가 세 개(abs, formatAbs, main) 있다.
+
+```scala
+def abs(n: Int): Int: 정수(Int) 하나를 받고 결과 값으로 정수를 돌려주는 순수 함수
+private def formatAbs(x: Int): 추론 가능한 반환 형식은 생략 가능 
+def main(args: Array[String]): Unit: 순수 함수적 핵심부를 호출하는 외부 계층으로서 다른 
+말로는 절차 또는 불순 함수
+```
+
+메서드 선언에서 등호를 기준으로 좌측에 있는 것을 좌변(left-hand side) 또는 **서명**이라고 하고, 우측을 우변(right-hand side) 또는 **정의**라고 부른다. 메서드 우변의 평가 결과가 반환 값이 되기 때문에 명시적인 return 키워드가 없다.
+
+## 2.2 프로그램의 실행
+일반적으로는 sbt(스칼라용 빌드 도구) 또는 IDE(IntelliJ, Eclipse) 이용하며, 이번 절에서는 짧은 예제에 적합한 방법을 소개한다.
+
+콘솔에서 직접 스칼라 코드를 컴파일하고 실행하는 방법
+
+```scala
+> scalac MyModule.scala
+
+> scala MyModule
+The absolute value of -42 is 42.
+REPL(read-evaluate-print loop)로 실행하는 방법
+
+> scala
+Welcome to Scala 2.11.8 (Java HotSpot(TM) 64-Bit Server VM, Java 1.8.0_65).
+Type in expressions for evaluation. Or try :help.
+
+scala> :load MyModule.scala
+Loading MyModule.scala...
+defined object MyModule
+
+scala> MyModule.abs(-42)
+res0: Int = 42
+```
+
+## 2.3 모듈, 객체, 이름공간
+스칼라의 모든 값은 **객체**이다.
+
+자신의 멤버들에게 **네임스페이스**를 제공하는 것이 주 목적인 객체를 **모듈**이라고 부른다.
+
+멤버는 def로 선언된 메서드, val이나 object로 선언된 또 다른 객체일 수 있다.
+
+```scala
+scala> import MyModule.abs
+import MyModule.abs
+
+scala> abs(-42)
+res0: 42
+
+scala> import MyModule._
+import MyModule._
+```
+
+## 2.4 고차 함수: 함수를 함수에 전달
+고차 함수란 다른 함수를 인수로 받는 함수
+
+### 2.4.1 잠깐 곁가지: 함수적으로 루프 작성하기
+
+루프를 함수적으로(루프 변수의 변이 없이) 작성하는 방법은 재귀 함수를 이용하는 것이다. 스칼라는 **자기 재귀(self-recursion)**를 검출해서 재귀 호출이 **꼬리 위치(tail position)**에서 일어난다면 **꼬리 호출 제거(tail call elimination)**를 적용하여 컴파일러 최적화를 통해 while 루프를 사용했을 때와 같은 종류의 바이트코드로 컴파일을 한다.
+
+@annotation.tailrec을 이용하여 꼬리 재귀를 검출할 수 있다.
+
+```scala
+def factorial(n: Int): Int = {
+  if (n <= 1) 1
+  else n * factorial(n - 1)
+}
+
+def factorial(n: Int): Int = {
+  @annotation.tailrec
+  def go(n: Int, acc: Int): Int =
+    if (n <= 0) acc
+    else go(n - 1, n + acc)
+  
+  go(n, 1)
+}
+
+//stackoverflow 주의!
+```
+
+■ 연습문제 2.1
+
+n번째 피보나치 수(Fibonacci number)를 돌려주는 재귀 함수를 작성하라. 처음 두 피보나치 수는 0과 1이다. n번째 피보나치 수는 항상 이전 두 수의 합이다. 즉, 피보나치 수열은 0, 1, 1, 2, 3, 5로 시작한다. 반드시 지역 꼬리 재귀 함수를 사용해서 작성할 것.
+
+def fib(n: Int): Int
+
+```scala
+def fib(n: Int): Int = {
+  @annotation.tailrec
+  def loop(n: Int, prev: Int, cur: Int): Int =
+    if (n == 0) prev
+    else loop(n - 1, cur, prev + cur)
+  loop(n, 0, 1)
+}
+```
+
+### 2.4.2 첫 번째 고차 함수 작성
+```scala 
+private def formabAbs(x: Int) = {
+  val msg = "The absolute value of %d is %d."
+  msg.format(x, abs(x))
+}
+  
+private def formatFactorial(n: Int) = {
+  val msg = "The factorial of %d is %d."
+  msg.format(n, factorial(n))
+}
+```
+formatAbs와 formatFactorial은 거의 동일하다. 두 함수에서 적용할 함수 이름과 함수 자체를 인수로 받는다면 다음과 같이 일반화할 수 있다.
+
+```scala
+def formatResult(name: String, n: Int, f: Int => Int) = {
+  val msg = "The %s of %d is %d."
+  msg.format(name, n, f(n))
+}
+```
+
+## 2.5 다형적 함수: 형식에 대한 추상
+- 단형적 함수(monomorphic function): 한 형식의 자료에만 작용하는 함수
+- 다형적 함수(polymorphic function): 임의의 형식에 대해 작동하는 함수
+
+### 2.5.1 다형적 함수의 예
+```scala
+def findFirst(ss: Array[String], key: String): Int = {
+  @annotation.tailrec
+  def loop(n: Int): Int = 
+    if (n >= ss.length) -1
+    else if (ss(n) == key) n
+    else loop(n + 1)
+  
+  loop(0)
+}
+```
+
+위의 findFirst 함수는 Array[String]에서 주어진 String과 일치하는 첫 번째 인덱스 값을 돌려주는 단형적 함수이다. 이를 임의의 형식 A에 대해 Array[A]에서 A를 찾는 다형적 함수로 변경하면 다음과 같다.
+
+```scala
+def findFirst[A](as: Array[A], p: A => Boolean): Int = {
+  @annotation.tailrec
+  def loop(n: Int): Int = 
+    if (n >= as.length) -1
+    else if (p(as(n)) n
+    else loop(n + 1)
+  
+  loop(0)
+}
+```
+
+■ 연습문제 2.2
+
+Array[A]가 주어진 비교 함수에 의거해서 정렬되어 있는지 점검하는 isSorted 함수를 구현하라. 서명은 다음과 같다.
+
+```scala
+def isSorted[A](as: Array[A], ordered: (A, A) => Boolean): Boolean
+```
+
+```scala
+def isSorted[A](as: Array[A], condition: (A,A) => Boolean): Boolean = {
+  @annotation.tailrec
+  def go(n: Int): Boolean =
+    if (n >= as.length-1) true
+    else if (condition(as(n), as(n+1))) false
+    else go(n+1)
+
+  go(0)
+}
+```
+
+### 2.5.2 익명 함수로 고차 함수 호출
+고차 함수를 호출할 때, 기존의 이름 붙은 함수를 인수로 지정해서 호출하는 것이 아니라 익명 함수 또는 **함수 리터럴**을 지정해서 호출하는 것이 편리한 경우가 많다.
+
+```scala
+scala> findFirst(Array(7, 9, 13), (x: Int) => x == 9)
+res2: Int = 1
+```
+(x: Int) => x == 9라는 구문은 함수 리터럴 또는 익명 함수이다. 함수의 인수들은 =>의 좌변에서 선언된다. 정수 두 개를 받아서 서로 같은지 판단하는 함수는 (x: Int, y: Int) => x == y로 정의한다.
+
+스칼라에서 값으로서의 함수
+
+함수 리터럴을 정의할 때 실제로 정의되는 것은 apply라는 메서드를 가진 하나의 객체이다. apply라는 메서드를 가진 객체는 그 자체를 메서드인 것처럼 호출할 수 있다. (a, b) => a < b는 사실 다음과 같은 객체 생성에 대한 syntactic sugar이다.
+
+```scala
+val lessThan = new Function2[Int, Int, Boolean] {
+  def apply(a: Int, b: Int) = a < b
+}
+```
+lessThan을 lessThan(10, 20) 형태로 호출하는 것은 lessThan.apply(10, 20)에 대한 syntactic sugar이다.
+
+## 2.6 형식에서 도출된 구현
+다형적 함수를 구현할 때에는 가능한 구현들의 공간이 크게 줄어든다. 주어진 다형적 형식에 대해 단 하나의 구현만 가능해질 정도로 가능성의 공간이 축소되는 경우도 있다. 단 한 가지 방법으로만 구현할 수 있는 함수 서명의 예를 살펴본다.
+
+부분 적용
+인자 목록이 둘 이상 있는 함수의 경우, 필요한 인자 중 일부만 적용해 새로운 함수를 정의
+
+```scala
+def partial1[A, B, C](a: A, f: (A, B) => C): B => C =
+  (b: B) => f(a, b)
+```
+
+커링(currying)
+
+- 여러 인자를 취하는 함수를 단 하나의 인자를 취하는 함수의 연속으로 변환
+
+■ 연습문제 2.3
+
+또 다른 예로, 인수가 두 개인 함수 f를 인수 하나를 받고 그것으로 f를 부분 적용하는 함수로 변환하는 **커링**을 살펴보자. 이번에도 컴파일되는 구현은 단 한 가지이다. 그러한 구현을 작성하라.
+
+```scala
+def curry[A, B, C](f: (A, B) => C): A => (B => C)
+```
+
+```scala
+def curry[A,B,C](f: (A, B) => C): A => (B => C) =
+  a => b => f(a, b)
+```
+
+□ 연습문제 2.4
+
+curry의 변환을 역으로 수행하는 고차 함수 uncurry를 구현하라. =>는 오른쪽으로 묶이므로, A => (B => C)를 A => B => C라고 표기할 수 있음을 주의할 것.
+
+```scala
+def uncurry[A, B, C](f: A => B => C): (A, B) => C
+```
+
+```scala
+def uncurry[A,B,C](f: A => B => C): (A, B) => C =
+  (a, b) => f(a)(b)
+```
+
+함수 합성(function composition)
+한 함수의 출력을 다른 함수의 입력으로 공급
+
+■ 연습문제 2.5
+두 함수를 합성하는 고차 함수를 구현하라.
+
+```scala
+def compose[A, B, C](f: B => C, g: A => B): A => C
+```

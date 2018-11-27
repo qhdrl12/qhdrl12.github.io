@@ -1,9 +1,19 @@
 theme: jekyll-theme-cayman
 
+highlighter: rouge
+
+paginate: 1
+
 locale: "en-US"
+
 title: "Develop!"
+
 title_separator: "-"
+
 name: "Bong"
+
 description: "Development Diary"
+
 url: "https://qhdrl12.github.io/"
-baseurl: ""
+
+baseurl: "/"
