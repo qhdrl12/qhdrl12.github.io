@@ -1,19 +1,30 @@
-theme: jekyll-theme-cayman
+title: Cayman Blog Theme
+description: Cayman Blog Theme is a clean, responsive blogging theme for Jekyll and Gitlab/GitHub Pages.
+show_downloads: true
 
-highlighter: rouge
+baseurl: "/cayman-blog" # change this to the subpath of your site, e.g. /blog. Leave it empty if you don't need it.
+url: "https://lorepirri.github.io" # change this to the base hostname & protocol for your site
 
-paginate: 1
 
-locale: "en-US"
+google_analytics:
 
-title: "Develop!"
+# cayman-blog date format
+# refer to http://shopify.github.io/liquid/filters/date/ if you want to customize this
+cayman-blog:
+  date_format: "%b %-d, %Y"
 
-title_separator: "-"
+theme: # leave it empty
 
-name: "Bong"
+# social
+author: lorepirri
+image: /thumbnail-jumbo.png
+twitter:
+  username: lorepirri
 
-description: "Development Diary"
+plugins:
+  - jekyll-target-blank
 
-url: "https://qhdrl12.github.io/"
+target-blank:
+    rel: nofollow
 
-baseurl: "/"
+header_page_refs: ['now', 'about', 'contact']
