@@ -2,7 +2,8 @@
 layout: default
 title: GeoRG
 parent: Kakaopay
-nav_order: 1
+grand_parent: Projects
+permalink: /docs/projects/kakaopay/georg/
 ---
 
 # Typography
