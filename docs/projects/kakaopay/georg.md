@@ -13,7 +13,7 @@ permalink: /docs/projects/kakaopay/georg/
 {: .no_toc .text-delta }
 
 1. TOC
-   {:toc}
+{:toc}
 
 ---
 
@@ -26,7 +26,7 @@ IP 기반 국가 코드 및 대략적인 도시 정보를 제공하는 서비스
 외국환거래 규정에 따라 해외결제 서비스가 지원되는 국가에서는 송금 받기가 제한 되어야 하는 등, 
 각 서비스별로 클라이언트에서 받은 IP가 해외결제국인지에 대한 확인 니즈로 부터 시작된 프로젝트 입니다.   
 
-[maxmind](https://www.maxmind.com/en/geoip2-services-and-databases) 사의 GeoIP를 데이터베이스로 사용하였습니다.
+database - [maxmind](https://www.maxmind.com/en/geoip2-services-and-databases)
 {: .fs-5 .ls-10 .code-example }
 
 ## Font stack
