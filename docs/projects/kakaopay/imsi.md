@@ -1,9 +1,9 @@
 ---
 layout: default
-title: FaceAuth
+title: Imsi
 parent: Kakaopay
 grand_parent: Projects
-permalink: /docs/projects/kakaopay/faceauth/
+permalink: /docs/projects/kakaopay/imsi/
 ---
 
 # 카카오페이 얼굴인식 서비스

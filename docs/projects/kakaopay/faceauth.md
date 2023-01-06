@@ -22,7 +22,7 @@ permalink: /docs/projects/kakaopay/faceauth/
 카카오페이의 송금/결제/전자서명 등에서 비밀번호, 지문인식과 같이 사용자의 얼굴 이미지를 하나의 인증수단으로 활용할수 있도록 제공하기 위한 서비스 입니다.
 Zoloz 솔루션을 사용합니다.(클라이언트 SDK, 서버 컴포넌트)
 
-## Roles
+## Role
 
 <div class="code-example" markdown="1">
 솔루션 내부 구축을 위한 전체 서비스 구성 및 이슈 대응 
